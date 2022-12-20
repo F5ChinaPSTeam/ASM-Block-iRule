@@ -1,0 +1,38 @@
+when RULE_INIT {  
+	set static::maxRate 50
+	set static::windowSecs 300
+	set static::holdtime 600
+}  
+ 
+when HTTP_REQUEST {
+#查看blacklist字表中客户端源IP对应的值是否存在
+if { [table lookup -subtable "blacklist" [IP::client_addr]] != "" } { 
+#存在则直接drop，并跳出iRules.
+	set a [table lifetime -subtable "blacklist" -remaining [IP::client_addr]]
+	log local0. "blacklist=[IP::client_addr]------will be blocked $a" 
+	HTTP::respond 501 content "you will be blocked $a."	
+	return
+} 
+}
+
+when ASM_REQUEST_DONE {  
+if { [ class match [lindex [ASM::violation_data] 3] equals class_severity ] } {  
+#根据subtable表查源ip得到次数，设置次数的变量为getCount
+	set getCount [table key -count -subtable [IP::client_addr]]  
+	log local0. "getCount=$getCount,severity=[lindex [ASM::violation_data] 3]"  
+	if { $getCount < $static::maxRate } { 
+#如果次数小于maxRate次数则在subtable中增加1
+		incr getCount 1  
+#建立客户端源IP及违规数量的表，lifetime时间为$static::windowSecs
+		table set -subtable [IP::client_addr] $getCount indef $static::windowSecs  
+	} else {  
+		log local0. "hack=$getCount"
+#建立客户端源IP对应blacklist的表，表的lifetime为$static::holdtime
+		table add -subtable "blacklist" [IP::client_addr] "blocked" indef $static::holdtime
+#F5返回501错误响应页面提示用户将被锁定$static::holdtime
+		HTTP::respond 501 content "you will be blocked $static::holdtime." 
+		log local0. "you will be blocked $static::holdtime"
+		return 
+		}  
+	}  
+}
