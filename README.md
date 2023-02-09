@@ -2,7 +2,6 @@
 ![image](https://user-images.githubusercontent.com/120350543/217751673-01c34d69-f447-436a-9722-93d185eba1ab.png)
 
 备注：
-# ASM-Block-iRule
 
 Block illegal client ip if it violate ASM policy in a specific rate:
 
